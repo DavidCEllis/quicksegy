@@ -190,8 +190,8 @@ class TraceHeader:
         'SWEEP_FREQUENCY_END': StructPair(128, INT16),
         'SWEEP_LENGTH': StructPair(130, INT16),
         'SWEEP_TYPE': StructPair(132, INT16),
-        'SWEEP_TRACE_TAPER_LENGTH_START': StructPair(134, INT32),
-        'SWEEP_TRACE_TAPER_LENGTH_END': StructPair(136, INT32),
+        'SWEEP_TRACE_TAPER_LENGTH_START': StructPair(134, INT16),
+        'SWEEP_TRACE_TAPER_LENGTH_END': StructPair(136, INT16),
         'TAPER_TYPE': StructPair(138, INT16),
         'ALIAS_FILTER_FREQ': StructPair(140, INT16),
         'ALIAS_FILTER_SLOPE': StructPair(142, INT16),
@@ -232,7 +232,7 @@ class TraceHeader:
         'SOURCE_MEASUREMENT': StructPair(224, INT32),
         'SOURCE_MEASUREMENT_EXPONENT': StructPair(228, INT16),
         'SOURCE_MEASUREMENT_UNIT': StructPair(230, INT16),
-        'HEADER_NAME': StructPair(233, '8c'),  # 8 chars
+        'HEADER_NAME': StructPair(232, '8c'),  # 8 chars
     }
     DEFAULT_STRUCT = MultiStruct(STRUCT_DICT, ENDIAN)
 
@@ -244,9 +244,9 @@ class TraceHeader:
         :param header_edits:
         """
         self.endian = endian
+        self.struct_dict = {**self.STRUCT_DICT}
 
         if header_edits:
-            self.struct_dict = {**self.STRUCT_DICT}
             self.struct_dict.update(header_edits)
             self.multistruct = MultiStruct(self.struct_dict, self.endian)
         elif self.endian != self.ENDIAN:
@@ -256,6 +256,18 @@ class TraceHeader:
 
         self.data = self.multistruct.unpack(data)
         self._transform_ibm()
+
+    def __str__(self):
+        return str(self.data)
+
+    def __getitem__(self, key):
+        return self.data[key]
+
+    def __getattr__(self, key):
+        try:
+            return self.data[key]
+        except KeyError:
+            raise AttributeError(f'BinaryHeader object has no attribute \'{key}\'')
 
     def _transform_ibm(self):
         for key in self.data.keys():
@@ -306,15 +318,19 @@ class TraceData:
 
 
 class TraceHeaderIndexer:
-    def __init__(self, path, trace_size, header_edits, endian):
+    def __init__(self, path, trace_size, trace_count, header_edits, endian):
         self.start_offset = TextHeader.CHARACTERS + BinaryHeader.SIZE
         self.path = Path(path)
         self.trace_size = trace_size + TraceHeader.SIZE
+        self.trace_count = trace_count
         self.header_edits = header_edits
         self.endian = endian
 
     def read_header(self, handle, idx):
         # not the fastest method but will do for now
+        if idx > self.trace_count:
+            raise IndexError(f'Index {idx} out of range.')
+
         handle.seek(self.start_offset + self.trace_size * idx)
         return TraceHeader.from_file(handle,
                                      header_edits=self.header_edits,
@@ -324,6 +340,7 @@ class TraceHeaderIndexer:
         with self.path.open('rb') as sgy:
             if isinstance(trace_no, slice):
                 start, stop, step = trace_no.start, trace_no.stop, trace_no.step
+                step = 1 if step is None else step
                 data = [self.read_header(sgy, i) for i in range(start, stop, step)]
             else:
                 data = self.read_header(sgy, trace_no)
@@ -355,20 +372,25 @@ class SegY:
         self.endian = endian
 
         with self.filepath.open('rb') as segy_data:
-            self.textheader = TextHeader.from_file(segy_data, self.text_encoding)
+            self.text_header = TextHeader.from_file(segy_data, self.text_encoding)
             self.binary_header = BinaryHeader.from_file(segy_data,
                                                         self.binheader_edits,
                                                         self.binheader_overrides,
                                                         self.endian)
 
         self.samples_per_trace = self.binary_header['SAMPLES_PER_TRACE']
-        self.sample_format = SampleFormat(self.binary_header['SAMPLE_FORMAT'])
+        self.sample_format = SampleFormat(self.binary_header['SAMPLE_FORMAT_CODE'])
         self.sample_size = self.sample_format.size
         self.trace_size = self.sample_size * self.samples_per_trace
+
+        filesize = self.filepath.stat().st_size
+        data_size = (filesize - TextHeader.CHARACTERS - BinaryHeader.SIZE)
+        self.trace_count = data_size // (TraceHeader.SIZE + self.trace_size)
 
         self._loaded = False
         self.headerindexer = TraceHeaderIndexer(self.filepath,
                                                 self.trace_size,
+                                                self.trace_count,
                                                 self.trheader_edits,
                                                 self.endian)
 
