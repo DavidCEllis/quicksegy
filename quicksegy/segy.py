@@ -1,4 +1,5 @@
 import array
+from collections import namedtuple
 from pathlib import Path
 
 from .struct_utils import (
@@ -232,7 +233,6 @@ class TraceHeader:
         'SOURCE_MEASUREMENT': StructPair(224, INT32),
         'SOURCE_MEASUREMENT_EXPONENT': StructPair(228, INT16),
         'SOURCE_MEASUREMENT_UNIT': StructPair(230, INT16),
-        'HEADER_NAME': StructPair(232, '8c'),  # 8 chars
     }
     DEFAULT_STRUCT = MultiStruct(STRUCT_DICT, ENDIAN)
 
@@ -328,10 +328,13 @@ class TraceHeaderIndexer:
 
     def read_header(self, handle, idx):
         # not the fastest method but will do for now
-        if idx > self.trace_count:
+        if idx >= self.trace_count or idx < -self.trace_count:
             raise IndexError(f'Index {idx} out of range.')
 
-        handle.seek(self.start_offset + self.trace_size * idx)
+        if idx >= 0:
+            handle.seek(self.start_offset + self.trace_size * idx)
+        else:
+            handle.seek(self.start_offset + self.trace_size * (idx + self.trace_count))
         return TraceHeader.from_file(handle,
                                      header_edits=self.header_edits,
                                      endian=self.endian)
@@ -340,11 +343,20 @@ class TraceHeaderIndexer:
         with self.path.open('rb') as sgy:
             if isinstance(trace_no, slice):
                 start, stop, step = trace_no.start, trace_no.stop, trace_no.step
+                start = 0 if start is None else start
+                stop = self.trace_count if stop is None else stop
                 step = 1 if step is None else step
                 data = [self.read_header(sgy, i) for i in range(start, stop, step)]
-            else:
+            elif isinstance(trace_no, int):
                 data = self.read_header(sgy, trace_no)
+            else:
+                raise TypeError(
+                    f'Trace Header Indices must be INT or slice, '
+                    f'not {type(trace_no)}'
+                )
 
+        # Pycharm doesn't take the TypeError as not being a real branch
+        # noinspection PyUnboundLocalVariable
         return data
 
 
@@ -402,8 +414,52 @@ class SegY:
             return self.headerindexer
 
 
+Nav2D = namedtuple('Nav2D', 'trace sp cdp x y')
+Nav3D = namedtuple('Nav3D', 'trace inline xline x y')
+
+
 class SegY2D(SegY):
-    pass
+    def sampled_nav(
+            self,
+            count,
+            trace_loc='TRACE_NO_LINE',
+            sp_loc='SP',
+            cdp_loc='CDP',
+            nav_loc='CDP',
+            use_nav_scalar=True,
+            use_sp_scalar=True,
+    ):
+        x_loc, y_loc = nav_loc + '_X', nav_loc + '_Y'
+        interval = self.trace_count // count
+        if interval < 1:
+            interval = 1
+
+        samples = self.trace_header[::interval]
+        if (self.trace_count - 1) not in range(0, self.trace_count, interval):
+            samples.append(self.trace_header[self.trace_count-1])
+
+        nav = []
+        for sample in samples:
+            trace, sp, cdp = sample[trace_loc], sample[sp_loc], sample[cdp_loc]
+            x, y = sample[x_loc], sample[y_loc]
+
+            if use_sp_scalar:
+                scalar = sample['SP_SCALAR']
+                if scalar > 0:
+                    sp *= scalar
+                elif scalar < 0:
+                    sp /= -scalar
+
+            if use_nav_scalar:
+                scalar = sample['COORDINATE_SCALAR']
+                if scalar > 0:
+                    x, y = x * scalar, y * scalar
+                elif scalar < 0:
+                    x, y = x / -scalar, y / -scalar
+
+            nav.append(Nav2D(trace, sp, cdp, x, y))
+
+        return nav
 
 
 class SegY3D(SegY):
