@@ -2,6 +2,11 @@ import array
 from collections import namedtuple
 from pathlib import Path
 
+try:
+    import shapely.geometry as geometry
+except ModuleNotFoundError:
+    geometry = None
+
 from .struct_utils import (
     UCHAR,  # CHAR,
     UINT16, INT16,
@@ -413,6 +418,17 @@ class SegY:
         else:
             return self.headerindexer
 
+    def sampled_headers(self, count):
+        interval = self.trace_count // count
+        if interval < 1:
+            interval = 1
+
+        samples = self.trace_header[::interval]
+        if (self.trace_count - 1) not in range(0, self.trace_count, interval):
+            samples.append(self.trace_header[self.trace_count - 1])
+
+        return samples
+
 
 Nav2D = namedtuple('Nav2D', 'trace sp cdp x y')
 Nav3D = namedtuple('Nav3D', 'trace inline xline x y')
@@ -422,6 +438,7 @@ class SegY2D(SegY):
     def sampled_nav(
             self,
             count,
+            *,
             trace_loc='TRACE_NO_LINE',
             sp_loc='SP',
             cdp_loc='CDP',
@@ -442,13 +459,8 @@ class SegY2D(SegY):
         :return: list of (trace, sp, cdp, x, y) namedtuples.
         """
         x_loc, y_loc = nav_loc + '_X', nav_loc + '_Y'
-        interval = self.trace_count // count
-        if interval < 1:
-            interval = 1
 
-        samples = self.trace_header[::interval]
-        if (self.trace_count - 1) not in range(0, self.trace_count, interval):
-            samples.append(self.trace_header[self.trace_count-1])
+        samples = self.sampled_headers(count)
 
         nav = []
         for sample in samples:
@@ -473,6 +485,105 @@ class SegY2D(SegY):
 
         return nav
 
+    def get_geometry(
+            self,
+            count,
+            *,
+            nav_loc='CDP',
+            use_nav_scalar=True,
+    ):
+        if geometry is None:
+            raise ModuleNotFoundError('Module \'shapely\' could not be found')
+
+        x_loc, y_loc = nav_loc + '_X', nav_loc + '_Y'
+
+        samples = self.sampled_headers(count)
+
+        nav = []
+        for sample in samples:
+            x, y = sample[x_loc], sample[y_loc]
+
+            if use_nav_scalar:
+                scalar = sample['COORDINATE_SCALAR']
+                if scalar > 0:
+                    x, y = x * scalar, y * scalar
+                elif scalar < 0:
+                    x, y = x / -scalar, y / -scalar
+
+            nav.append((x, y))
+        return geometry.LineString(nav)
+
 
 class SegY3D(SegY):
-    pass
+    def sampled_nav(
+            self,
+            count,
+            *,
+            trace_loc='TRACE_NO_LINE',
+            inline_loc='INLINE',
+            crossline_loc='CROSSLINE',
+            nav_loc='CDP',
+            use_nav_scalar=True,
+    ):
+        x_loc, y_loc = nav_loc + '_X', nav_loc + '_Y'
+
+        samples = self.sampled_headers(count)
+
+        nav = []
+
+        for sample in samples:
+            trace = sample[trace_loc]
+            inline, crossline = sample[inline_loc], sample[crossline_loc]
+            x, y = sample[x_loc], sample[y_loc]
+
+            if use_nav_scalar:
+                scalar = sample['COORDINATE_SCALAR']
+                if scalar > 0:
+                    x, y = x * scalar, y * scalar
+                elif scalar < 0:
+                    x, y = x / -scalar, y / -scalar
+
+            nav.append(Nav3D(trace, inline, crossline, x, y))
+
+        return nav
+
+    def get_point_geometry(
+            self,
+            count,
+            *,
+            nav_loc='CDP',
+            use_nav_scalar=True,
+    ):
+        if geometry is None:
+            raise ModuleNotFoundError('Module \'shapely\' could not be found')
+
+        x_loc, y_loc = nav_loc + '_X', nav_loc + '_Y'
+
+        samples = self.sampled_headers(count)
+
+        nav = []
+        for sample in samples:
+            x, y = sample[x_loc], sample[y_loc]
+
+            if use_nav_scalar:
+                scalar = sample['COORDINATE_SCALAR']
+                if scalar > 0:
+                    x, y = x * scalar, y * scalar
+                elif scalar < 0:
+                    x, y = x / -scalar, y / -scalar
+
+            nav.append((x, y))
+
+        return geometry.MultiPoint(nav)
+
+    def get_geometry(
+            self,
+            count,
+            *,
+            nav_loc='CDP',
+            use_nav_scalar=True,
+    ):
+        points = self.get_point_geometry(count,
+                                         nav_loc=nav_loc,
+                                         use_nav_scalar=use_nav_scalar)
+        return points.convex_hull
