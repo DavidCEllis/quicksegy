@@ -7,23 +7,26 @@ random access slow.
 
 I still need test files for revision 2 as I haven't seen any 'in the wild'.
 
-### Planned Features (for v1.0) ###
-    
+### Implemented ###
+
     * Read standard text headers in ebcdic and ascii
     * Read binary headers including new REV 2 additions
-    * Read additional text headers
-    * Handle trace headers and fixed numbers of extended trace headers
     * Overriding incorrect header values
+    * Handle trace headers
+    * Shapely support for geometries (point and convex for 3d)
+    
+### Planned Features (for v1.0) ###
+    
+    * Read additional text headers
+    * Handle fixed numbers of extended trace headers
     * Solid test coverage for REV 1 data
         * Full REV 2 tests depend on actually getting some REV 2 data I can use
 
 ### Planned Features (for a later release) ###
 
-    * Shapely/Geopandas support for geometries
     * Numpy support for the array data
     * Matplotlib support to show the seismic data
-    
-    * Modifying SEG-Y Files in place (possibly)
+    * Modifying SEG-Y File headers in place (possibly)
     
 ### Unsupported features (will not be supported) ###
 
