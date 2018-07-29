@@ -429,6 +429,18 @@ class SegY2D(SegY):
             use_nav_scalar=True,
             use_sp_scalar=True,
     ):
+        """
+        Get approximately *count* samples of navigation
+
+        :param count: rough number of samples wanted
+        :param trace_loc: key of trace data in header
+        :param sp_loc: key of SP data in header
+        :param cdp_loc: key of CDP data in header
+        :param nav_loc: Start of key of navigation in header (eg: 'CDP')
+        :param use_nav_scalar: Use the navigation scalar in the header
+        :param use_sp_scalar: Use the shotpoint scalar in the header
+        :return: list of (trace, sp, cdp, x, y) namedtuples.
+        """
         x_loc, y_loc = nav_loc + '_X', nav_loc + '_Y'
         interval = self.trace_count // count
         if interval < 1:
