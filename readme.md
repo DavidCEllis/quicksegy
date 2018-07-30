@@ -1,11 +1,15 @@
 # Quick SEGY #
 
-A small library for quickly looking at SEG-Y via random access.
+A small Python 3.6+ library for quickly looking at SEG-Y with 
+no required dependencies.
 
-Intended to support most of SEG-Y Revision 2 except for those features that make 
-random access slow.
+No tests written yet, I just needed the thing to work quickly
+to examine some data.
 
-I still need test files for revision 2 as I haven't seen any 'in the wild'.
+Intended to eventually support most of SEG-Y Revision 2 except
+for those features that make random access slow.
+
+I still need to find files for revision 2 as I haven't seen any 'in the wild'.
 
 ### Implemented ###
 
@@ -17,6 +21,7 @@ I still need test files for revision 2 as I haven't seen any 'in the wild'.
     
 ### Planned Features (for v1.0) ###
     
+    * Pre-load headers
     * Read additional text headers
     * Handle fixed numbers of extended trace headers
     * Solid test coverage for REV 1 data
