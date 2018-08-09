@@ -1,6 +1,6 @@
 import struct
 
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 
 
 # Unit aliases for format strings
@@ -10,12 +10,15 @@ CHAR = 'b'
 UCHAR = 'B'
 INT16 = 'h'
 UINT16 = 'H'
-INT32 = 'i'
-UINT32 = 'I'
+INT32 = 'l'
+UINT32 = 'L'
 INT64 = 'q'
 UINT64 = 'Q'
 FLOAT = 'f'
 DOUBLE = 'd'
+VALID_TYPES = ''.join(
+    [CHAR, UCHAR, INT16, UINT16, INT32, UINT32, INT64, UINT64, FLOAT, DOUBLE]
+)
 
 
 class StructPair:
@@ -28,22 +31,34 @@ class StructPair:
     def __repr__(self):
         classname = self.__class__.__name__
         r = f'{classname}({self.offset}, ' \
-            f'{self.ctype}, ibm_float={self.ibm_float})'
+            f'"{self.ctype}", ibm_float={self.ibm_float})'
         return r
 
 
 class SingleStruct:
-    def __init__(self, offset, struct_, names):
-        # type: (int, struct.Struct, List[str]) -> None
+    """
+    A utility to unpack a struct into a dictionary.
+
+    Provide an initial offset, struct object and a list of names to unpack into.
+    Mainly used as part of a multistruct.
+
+    :param struct_: Python Struct
+    :param names: List of names to unpack the struct into
+    :param offset: offset to start reading from given data
+    """
+    def __init__(self, struct_, names, offset=0):
+        # type: (struct.Struct, List[str], int) -> None
         self.offset = offset
         self.struct_ = struct_
         self.names = names
 
     def __repr__(self):
         classname = self.__class__.__name__
-        return f'{classname}({self.offset}, {self.struct_}, {self.names})'
+        return (f'{classname}(struct.Struct(\'{self.struct_.format}\'), '
+                f'{self.names}, offset={self.offset})')
 
     def unpack(self, data):
+        # type: (bytes) -> Dict[str, Any]
         result = self.struct_.unpack_from(data, offset=self.offset)
         return dict(zip(self.names, result))
 
@@ -54,6 +69,8 @@ class MultiStruct:
         """
         Create a class that acts like a python struct but allows gaps and overlaps
         and unpacks to a dictionary. Assumes one endianness for the whole set.
+
+        Only for unpacking
 
         :param struct_dict: Dictionary of key names and structpairs
         :param endian: Endianness of structs
@@ -77,6 +94,7 @@ class MultiStruct:
 
         structs = []  # type: List[SingleStruct]
         for key, value in self.source.items():
+            # Check if we are still part of a single struct
             if value.offset == last_index:
                 current_struct.append(value.ctype)
                 last_index += struct.calcsize(value.ctype)
@@ -84,7 +102,7 @@ class MultiStruct:
             else:
                 # Add previous struct
                 struct_str = self.endian + ''.join(current_struct)
-                last_struct = SingleStruct(index_val, struct.Struct(struct_str), names)
+                last_struct = SingleStruct(struct.Struct(struct_str), names, offset=index_val)
                 structs.append(last_struct)
 
                 # Clear and create next struct
@@ -95,7 +113,7 @@ class MultiStruct:
 
         # Finally add the last struct before it cleared
         struct_str = self.endian + ''.join(current_struct)
-        last_struct = SingleStruct(index_val, struct.Struct(struct_str), names)
+        last_struct = SingleStruct(struct.Struct(struct_str), names, offset=index_val)
         structs.append(last_struct)
         return structs
 
