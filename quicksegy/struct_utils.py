@@ -97,7 +97,7 @@ class MultiStruct:
             # Check if we are still part of a single struct
             if value.offset == last_index:
                 current_struct.append(value.ctype)
-                last_index += struct.calcsize(value.ctype)
+                last_index += struct.calcsize(self.endian + value.ctype)
                 names.append(key)
             else:
                 # Add previous struct
@@ -108,7 +108,7 @@ class MultiStruct:
                 # Clear and create next struct
                 index_val = value.offset
                 current_struct = [value.ctype]
-                last_index = index_val + struct.calcsize(value.ctype)
+                last_index = index_val + struct.calcsize(self.endian + value.ctype)
                 names = [key]
 
         # Finally add the last struct before it cleared
