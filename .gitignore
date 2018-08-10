@@ -1,6 +1,10 @@
 # Created by .ignore support plugin (hsz.mobi)
 .idea/
 
+# Notebooks for planning
+notebooks/
+
+
 ### VisualStudioCode
 .vscode/
 
