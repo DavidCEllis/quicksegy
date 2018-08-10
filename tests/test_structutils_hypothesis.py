@@ -4,8 +4,7 @@ import struct
 from hypothesis import given
 from hypothesis.strategies import booleans, data, floats, integers, lists, sampled_from
 
-from quicksegy.struct_utils import StructPair, SingleStruct, MultiStruct
-
+from quicksegy.internals.struct_utils import StructPair, SingleStruct
 
 hypothesis_types = {
     'b': integers(min_value=-2**7, max_value=2**7-1),

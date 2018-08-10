@@ -7,7 +7,7 @@ try:
 except ModuleNotFoundError:
     geometry = None
 
-from .struct_utils import (
+from quicksegy.internals.struct_utils import (
     UCHAR,  # CHAR,
     UINT16, INT16,
     UINT32, INT32,
@@ -16,8 +16,8 @@ from .struct_utils import (
     StructPair, MultiStruct
 )
 
-from .header_enums import SampleFormat
-from .ibmfloat import ibm_to_float
+from quicksegy.internals.header_enums import SampleFormat
+from quicksegy.internals.ibmfloat import ibm_to_float
 
 
 class TextHeader:

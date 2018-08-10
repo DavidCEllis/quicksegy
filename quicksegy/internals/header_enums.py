@@ -1,7 +1,7 @@
 import struct
 from enum import IntEnum
 
-from . import struct_utils
+from quicksegy.internals import struct_utils
 
 
 class SampleFormat(IntEnum):

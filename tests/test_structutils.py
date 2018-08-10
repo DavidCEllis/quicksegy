@@ -2,7 +2,7 @@ import struct
 
 import pytest
 
-from quicksegy.struct_utils import StructPair, MultiStruct
+from quicksegy.internals.struct_utils import StructPair, MultiStruct
 
 
 @pytest.fixture
