@@ -40,6 +40,13 @@ class TextHeader:
 
     @classmethod
     def from_file(cls, handle, encoding='EBCDIC-CP-BE'):
+        """
+        Handle text header from python file handle seeked to start
+
+        :param handle: file handle
+        :param encoding: text encoding (default: EBCDIC-CP-BE)
+        :return: Text Header
+        """
         data = handle.read(cls.CHARACTERS)
         return cls(data, encoding)
 
@@ -139,12 +146,26 @@ class BinaryHeader:
 
     @classmethod
     def from_file(cls, handle, edits=None, overrides=None, endian=ENDIAN):
+        """
+            Read trace header from file with seek in correct position
+
+            :param handle: python file handle
+            :param edits: binary header edits
+            :param overrides: binary header overrides
+            :param endian: data endianness
+            :return: new instance
+            """
         handle.seek(TextHeader.CHARACTERS)
         data = handle.read(cls.SIZE)
         return cls(data, edits, overrides, endian)
 
 
 class TraceHeader:
+    """
+    SEG-Y Trace Header handler
+
+    Dict-like access to all header keys.
+    """
     SIZE = 240
     ENDIAN = '>'
     STRUCT_DICT = {
@@ -243,10 +264,11 @@ class TraceHeader:
 
     def __init__(self, data, header_edits=None, endian=ENDIAN):
         """
-        Parse the binary header
+        Parse the trace header
 
-        :param data: binary header data as a bytestring
-        :param header_edits:
+        :param data: trace header data as a bytestring
+        :param header_edits: changes to the header structure as a dict
+                             {'key': Structpair(offset, type)} (offsets start at 0)
         """
         self.endian = endian
         self.struct_dict = {**self.STRUCT_DICT}
@@ -275,12 +297,23 @@ class TraceHeader:
             raise AttributeError(f'BinaryHeader object has no attribute \'{key}\'')
 
     def _transform_ibm(self):
+        """
+        Transform all IBM structured data to python floats
+        """
         for key in self.data.keys():
             if self.struct_dict[key].ibm_float:
                 self.data[key] = ibm_to_float(self.data[key])
 
     @classmethod
     def from_file(cls, handle, header_edits=None, endian=ENDIAN):
+        """
+        Read trace header from file with seek in correct position
+
+        :param handle: python file handle
+        :param header_edits: trace header edits
+        :param endian: data endianness
+        :return: new instance
+        """
         # Assumes seeked to correct location
         data = handle.read(cls.SIZE)
         return cls(data, header_edits, endian)
@@ -297,7 +330,18 @@ class ExtendedTraceHeader1:
 
 
 class TraceData:
+    """
+    Handle the trace data for a single trace.
+    """
+
     def __init__(self, data, format_code=1, endian='>'):
+        """
+        Store and prepare the trace data for decoding
+
+        :param data: trace data (binary bytestring)
+        :param format_code: (format code for data from binary header)
+        :param endian: (endianness of data '>' or '<')
+        """
         self._data = None
         self._raw_data = data
         self.format_code = SampleFormat(format_code)
@@ -323,7 +367,19 @@ class TraceData:
 
 
 class TraceHeaderIndexer:
+    """
+    Handle indexing and obtaining headers from traces by slicing.
+    """
     def __init__(self, path, trace_size, trace_count, header_edits, endian):
+        """
+
+        :param path: path to SEG-Y File
+        :param trace_size:  size of an individual trace (excluding headers)
+        :param trace_count: number of traces in the SEG-Y file
+        :param header_edits: edits to trace_header
+        :param endian: endianness of data
+        """
+
         self.start_offset = TextHeader.CHARACTERS + BinaryHeader.SIZE
         self.path = Path(path)
         self.trace_size = trace_size + TraceHeader.SIZE
@@ -332,6 +388,13 @@ class TraceHeaderIndexer:
         self.endian = endian
 
     def read_header(self, handle, idx):
+        """
+        Read traceheader into traceheader object
+
+        :param handle: file handle for the SEG-Y
+        :param idx: trace index
+        :return: TraceHeader object
+        """
         # not the fastest method but will do for now
         if idx >= self.trace_count or idx < -self.trace_count:
             raise IndexError(f'Index {idx} out of range.')
