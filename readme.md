@@ -3,8 +3,26 @@
 A small Python 3.6+ library for quickly looking at SEG-Y with 
 no required dependencies.
 
+The main goal for this was to quickly extract geometry data from a
+number of SEG-Y files to get shapefiles for GIS. Only does points or
+convex hulls for 3D to get shapes quickly (but not necessarily accurately).
+
 Minimal tests at this point, I just needed the thing to work quickly
 to examine some data.
+
+Quick usage example:
+
+```python
+from quicksegy import SegY2D, SegY3D
+
+sgy2d = SegY2D('path/to/segy_file.sgy')
+
+nav2d = sgy2d.sampled_nav(100, nav_loc='SOURCE')
+
+sgy3d = SegY3D('path/to/3d_file.sgy')
+
+nav3d = sgy3d.sampled_nav(500, nav_loc='GROUP')
+```
 
 ### Implemented ###
 
